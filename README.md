@@ -1,4 +1,4 @@
-# Vagrant profile for Drupal/PHP Continuous Integration Server
+# Vagrant profile for Drupal/PHP CI
 
 ## Background
 
