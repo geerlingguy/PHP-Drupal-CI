@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+Drupal 7 Phing build configuration example.
+
+This Phing build configuration can be used with Jenkins by creating a new Phing
+task, pointing it to this XML file, and running the 'build' target.
+
+Running the default 'build' target requires the following to be installed:
+    - Via package manager (yum/apt-get)
+        - ImageMagick
+        - php (+ php-devel, php-xml, php-pear)
+    - Via PEAR
+        - pear install phpunit/PHPUnit
+        - pear install phpunit/phpcpd
+        - pear install phpunit/phploc
+        - pear install phpmd/PHP_PMD
+        - pear install PHP_CodeSniffer
+        - pecl install xdebug
+        - pear install phing/phing
+
+The Drupal Coding Standards definitions must be installed into the Code Sniffer
+Standards directory. This can be done by downloading a copy of the Coder module
+for Drupal (https://drupal.org/project/coder) and linking the appropriate
+directory from that file into the proper php directory, like so:
+$ ln -sv /vagrant/config/coder/coder_sniffer/Drupal $(pear config-get php_dir)/PHP/CodeSniffer/Standards
+
+@author: Jeff Geerling
+
+@todo get phploc working for more code statistics (maybe).
+ -->
+
+<project name="Drupal7" default="build">
+
+    <!-- Target: build -->
+    <target name="build"
+            depends="init,
+                     clean,
+                     verify,
+                     analyze,
+                     deploy" />
+
+    <!-- Target: init
+    Set up directories and filesets. -->
+    <target name="init"
+            depends="setup-filesets,
+                     setup-dirs"
+            unless="project.initialized" />
+
+    <!-- Target: verify
+    Make sure we don't have any debug statements in our code. -->
+    <target name="verify"
+            depends="init,
+                     clean,
+                     check-php-debug,
+                     check-js-debug" />
+
+    <!-- Target: analyze
+    Perform static analysis of code to generate statistics, find problems, and
+    check for coding standards compliance. -->
+    <target name="analyze"
+            depends="init,
+                     clean,
+                     phpcpd,
+                     phpmd,
+                     phpcs" />
+
+    <!-- Target: deploy
+    Deploy the codebase to the development environment. -->
+    <target name="deploy"
+            depends="init,
+                     clean,
+                     setup-dirs,
+                     tar" />
+
+    <!-- # Verify targets ################################################## -->
+
+    <!-- Target: check-debug -->
+    <target name="check-debug"
+            depends="init">
+        <php function="strtolower" returnProperty="debug.language.lower">
+            <param value="${debug.language}" />
+        </php>
+        <property name="debug.output"
+                  value="${project.logdir}/debug_${debug.language.lower}.txt"
+                  override="true" />
+        <delete file="${debug.output}" quiet="true" />
+        <append text="" destFile="${debug.output}" />
+        <loadfile property="debug.lines" file="${debug.output}" />
+        <if>
+            <not>
+                <equals arg1="${debug.lines}" arg2="" />
+            </not>
+            <then>
+                <fail message="${debug.language} debug code detected:${line.separator}
+                               ${debug.lines}" />
+            </then>
+        </if>
+      </target>
+
+    <!-- Target: check-php-debug -->
+    <target name="check-php-debug"
+            description="Check custom PHP code for debug statements."
+            depends="init">
+        <phingcall target="check-debug">
+            <property name="debug.language" value="PHP" override="true" />
+            <property name="debug.pattern" value="(var_dump\(|dsm\(|dpm\()"
+                  override="true" />
+            <property name="debug.fileset" value="src.php.custom"/>
+        </phingcall>
+    </target>
+
+    <!-- Target: check-php-debug -->
+    <target name="check-js-debug"
+            description="Check custom Javascript code for debug statements.">
+        <phingcall target="check-debug">
+            <property name="debug.language" value="Javascript" override="true" />
+            <property name="debug.pattern" value="(console\.log\()" override="true" />
+            <property name="debug.fileset" value="src.js.custom"/>
+        </phingcall>
+    </target>
+
+    <!-- ## Analyze targets ################################################ -->
+
+    <!-- Target: phpcpd -->
+    <target name="phpcpd"
+            description="Generate pmd-cpd.xml using phpcpd"
+            depends="init">
+        <phpcpd>
+            <fileset refid="src.php.custom" />
+            <formatter type="pmd" outfile="${project.logdir}/pmd-cpd.xml"/>
+        </phpcpd>
+    </target>
+
+    <!-- Target: phploc -->
+    <!-- TODO: Right now we get the following error when trying to run phploc:
+    Fatal error: Class '\SebastianBergmann\PHPLOC\TextUI\ResultPrinter' not found in /usr/share/pear/phing/tasks/ext/phploc/PHPLocTask.php on line 208 -->
+    <target name="phploc"
+            description="Generate phploc.csv using phploc."
+            depends="init">
+        <phploc reportType="txt"
+                reportName="phploc" reportDirectory="${project.logdir}"
+                suffixes="php,module,inc,install,profile,test" countTests="true">
+            <fileset refid="src.php.custom" />
+        </phploc>
+    </target>
+
+    <!-- Target: phpmd -->
+    <target name="phpmd"
+            description="Generate php-md.xml using PHPMD."
+            depends="init">
+        <phpmd rulesets="codesize,naming,design">
+            <fileset refid="src.php.custom" />
+            <formatter type="xml" outfile="${project.logdir}/php-md.xml"/>
+        </phpmd>
+    </target>
+
+    <!-- Target: phpcs -->
+    <target name="phpcs"
+            description="Generate codesniffer.xml using PHP_CodeSniffer."
+            depends="init">
+        <phpcodesniffer
+            standard="Drupal"
+            showSniffs="true"
+            showWarnings="true"
+            ignorePatterns="*/contrib/*,*/*.features.*,*/*.field_group.inc,*/*.layout.*,*/*.pages_default.*,*/*.panels_default.*,*/*strongarm.inc,*/*.views_default.inc">
+            <fileset refid="src.php.custom" />
+            <formatter type="default" usefile="false"/>
+            <formatter type="checkstyle" outfile="${project.logdir}/codesniffer.xml"/>
+        </phpcodesniffer>
+    </target>
+
+    <!-- # Packaging targets ############################################### -->
+
+    <!-- Target: tar -->
+    <target name="tar"
+            description="Generate an archive of the Drupal 7 codebase."
+            depends="init, clean">
+        <if>
+            <istrue value="${project.deploy}" />
+            <then>
+                <tar destfile="${project.artifacts}/git-checkout-archive.tar.gz"
+                     compression="gzip"
+                     includeemptydirs="true">
+                    <fileset dir="${project.builddir}">
+                        <include name="**/**" />
+                    </fileset>
+                </tar>
+            </then>
+        </if>
+    </target>
+
+    <!-- Target: rsync -->
+    <!-- TODO: http://www.phing.info/docs/guide/stable/chapters/appendixes/AppendixC-OptionalTasks.html#FileSyncTask -->
+
+    <!-- Target: ssh -->
+    <!-- TODO: http://www.phing.info/docs/guide/stable/chapters/appendixes/AppendixC-OptionalTasks.html#SshTask -->
+
+    <!-- # Init targets #################################################### -->
+
+    <!-- Target: setup-filesets -->
+    <target name="setup-filesets"
+            depends="setup-dirs">
+        <patternset id="php">
+            <include name="**/*.php" />
+            <include name="**/*.module" />
+            <include name="**/*.install" />
+            <include name="**/*.inc" />
+            <include name="**/*.profile" />
+            <include name="**/*.test" />
+        </patternset>
+        <patternset id="js">
+            <include name="**/*.js" />
+            <exclude name="**/*.min.js" />
+        </patternset>
+        <patternset id="css">
+            <include name="**/*.css" />
+        </patternset>
+        <patternset id="contrib">
+            <exclude name="**/contrib/**/*.*" />
+            <exclude name="**/libraries/**/*.*" />
+        </patternset>
+        <patternset id="generated">
+            <exclude name="**/*.features.*" />
+            <exclude name="**/*.field_group.inc" />
+            <exclude name="**/*.layouts.inc" />
+            <exclude name="**/*.pages_default.inc" />
+            <exclude name="**/*.panelizer.inc" />
+            <exclude name="**/*.panels_default.inc" />
+            <exclude name="**/*.strongarm.inc" />
+            <exclude name="**/*.views_default.inc" />
+        </patternset>
+        <fileset id="src.php" dir="${project.drupal.dir}">
+            <patternset refid="php"/>
+        </fileset>
+        <fileset id="src.php.custom" dir="${project.sitesdir}">
+            <patternset refid="php"/>
+            <patternset refid="contrib"/>
+            <patternset refid="generated"/>
+        </fileset>
+        <fileset id="src.js" dir="${project.drupal.dir}">
+            <patternset refid="js" />
+        </fileset>
+        <fileset id="src.js.custom" dir="${project.sitesdir}">
+            <patternset refid="js" />
+            <patternset refid="contrib" />
+        </fileset>
+        <fileset id="src.css" dir="${project.basedir}">
+            <patternset refid="css" />
+        </fileset>
+        <fileset id="src.css.custom" dir="${project.sitesdir}">
+            <patternset refid="css" />
+            <patternset refid="contrib" />
+        </fileset>
+    </target>
+
+    <!-- Target: setup-dirs -->
+    <target name="setup-dirs">
+        <property name="project.logdir" value="${project.builddir}/logs" />
+        <property name="project.artifacts" value="${project.builddir}/artifacts" />
+        <property name="project.drupal.dir" value="${project.builddir}/drupal" />
+        <property name="project.sitesdir" value="${project.builddir}/drupal/sites" />
+    </target>
+
+    <!-- # Build targets ################################################### -->
+
+    <!-- Target: clean -->
+    <target name="clean"
+            description="Clean up and create artifact directories"
+            depends="setup-dirs"
+            unless="project.cleaned">
+        <delete dir="${project.logdir}" quiet="true" />
+        <mkdir dir="${project.logdir}"/>
+        <delete dir="${project.artifacts}" quiet="true" />
+        <mkdir dir="${project.artifacts}"/>
+        <property name="project.cleaned" value="true" />
+        <property name="project.cleaned" value="${project.deploy}" />
+    </target>
+
+</project>
