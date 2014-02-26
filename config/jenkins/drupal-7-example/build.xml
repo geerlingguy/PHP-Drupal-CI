@@ -165,7 +165,7 @@ $ ln -sv /vagrant/config/coder/coder_sniffer/Drupal $(pear config-get php_dir)/P
             showWarnings="true"
             ignorePatterns="*/contrib/*,*/*.features.*,*/*.field_group.inc,*/*.layout.*,*/*.pages_default.*,*/*.panels_default.*,*/*strongarm.inc,*/*.views_default.inc">
             <fileset refid="src.php.custom" />
-            <formatter type="default" usefile="false"/>
+            <!-- <formatter type="default" usefile="false"/> -->
             <formatter type="checkstyle" outfile="${project.logdir}/codesniffer.xml"/>
         </phpcodesniffer>
     </target>
