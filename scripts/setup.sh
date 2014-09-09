@@ -62,10 +62,13 @@ if [ "$?" = "0" ]; then
 fi
 
 # Install Java (openJDK) for Jenkins.
-yum install --quiet -y java-1.6.0-openjdk
+yum install --quiet -y java-1.7.0-openjdk
 if [ "$?" = "0" ]; then
-  echo "Installed Java."
+  echo "Installed Java (7)."
 fi
+
+# Install Apache Maven
+source /vagrant/scripts/maven.sh
 
 # Install Jenkins.
 source /vagrant/scripts/jenkins.sh
