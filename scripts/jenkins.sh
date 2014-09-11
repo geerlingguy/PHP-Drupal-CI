@@ -17,7 +17,7 @@ if [ "$?" = "0" ]; then
   chkconfig jenkins on
 
   # Wait for Jenkins to complete startup (it can take some time).
-  sleep 25
+  sleep 45
 
   # Manually update Jenkins' plugin directory. This is required because Jenkins
   # is silly/GUI-loving. See: https://gist.github.com/rowan-m/1026918
@@ -36,7 +36,8 @@ if [ "$?" = "0" ]; then
   java -jar jenkins-cli.jar -s http://$HOSTNAME:8080/ install-plugin sonar
   cp /vagrant/config/jenkins/hudson.plugins.sonar.SonarPublisher.xml /var/lib/jenkins/
   cp /vagrant/config/jenkins/hudson.plugins.sonar.SonarRunnerInstallation.xml /var/lib/jenkins/
-
+  cp /vagrant/config/jenkins/hudson.tasks.Maven.xml /var/lib/jenkins/
+  
   # Import the Jenkins job for Drupal7.
   # See: http://stackoverflow.com/a/9954283/100134
   java -jar jenkins-cli.jar -s http://$HOSTNAME:8080/ create-job Drupal7 < /vagrant/config/jenkins/Drupal7.xml

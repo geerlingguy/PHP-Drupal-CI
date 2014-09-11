@@ -22,7 +22,7 @@ Some things to note:
 
   1. You can set your hostname, and whether or not to use a proxy server inside `[vagrant_root]/config/config.sh`.
 
-Once the new VM is up and running (after `vagrant up` is complete and you're back at the command prompt), you can log into it via SSH if you'd like by typing in `vagrant ssh`. Otherwise, the next steps are below:
+Once the new VM is up and running (after `vagrant up` is complete and you're back at the command prompt), you can log into the host via SSH if you'd like by typing in `vagrant ssh`. 
 
 ### Setting up your hosts file
 
@@ -35,3 +35,13 @@ You need to modify your host machine's hosts file (Mac/Linux: `/etc/hosts`; Wind
 After that is configured, you could visit http://jenkins-sandbox:8080/ in a browser, and you'll see the Jenkins home page. Nice!
 
 If you'd like additional assistance editing your hosts file, please read [How do I modify my hosts file?](http://www.rackspace.com/knowledge_center/article/how-do-i-modify-my-hosts-file) from Rackspace.
+
+## Accessing the applications
+
+You can access the Jenkins instance at:
+
+> http://jenkins-sandbox:8080/
+
+and the Sonar instance at:
+
+> http://jenkins-sandbox:9000/
