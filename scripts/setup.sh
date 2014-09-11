@@ -64,7 +64,7 @@ fi
 # Install Java (openJDK) for Jenkins.
 yum install --quiet -y java-1.7.0-openjdk-devel
 if [ "$?" = "0" ]; then
-  echo "Installed Java (7)."
+  echo "Installed Java."
 fi
 
 # Install Apache Maven
